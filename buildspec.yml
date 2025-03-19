@@ -1,0 +1,41 @@
+version: 0.2
+
+env:
+  variables:
+    S3_BUCKET_NAME: "fortuna-media-storage"
+    EB_APP_NAME: "fortunaeapi"
+    EB_ENV_NAME: "fortunaeapi-dev"
+
+phases:
+  install:
+    runtime-versions:
+      dotnet: 8.0
+    commands:
+      - echo "Installing dependencies..."
+      - dotnet restore
+
+  build:
+    commands:
+      - echo "Building the application..."
+      - dotnet publish -c Release -o ./publish
+      - echo "Creating correct Procfile..."
+      - echo "web:dotnet ./fortunae.api.dll" > ./publish/Procfile
+
+  post_build:
+    commands:
+      - echo "Checking .runtimeconfig.json files..."
+      - ls -la ./publish/*.runtimeconfig.json || true
+      - echo "Zipping deployment package..."
+      - cd ./publish
+      - zip -r ../deploy.zip .
+      - cd ..
+      - echo "Uploading to S3..."
+      - aws s3 cp deploy.zip s3://$S3_BUCKET_NAME/deploy.zip
+      - echo "Creating new Elastic Beanstalk application version..."
+      - aws elasticbeanstalk create-application-version --application-name $EB_APP_NAME --version-label $CODEBUILD_BUILD_ID --source-bundle S3Bucket=$S3_BUCKET_NAME,S3Key=deploy.zip
+      - echo "Deploying new version to Elastic Beanstalk..."
+      - aws elasticbeanstalk update-environment --application-name $EB_APP_NAME --environment-name $EB_ENV_NAME --version-label $CODEBUILD_BUILD_ID
+
+artifacts:
+  files:
+    - deploy.zip

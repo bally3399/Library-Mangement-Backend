@@ -1,6 +1,6 @@
 **/.classpath
 **/.dockerignore
-**/.env
+# /.env  <-- Remove or comment out this line
 **/.git
 **/.gitignore
 **/.project

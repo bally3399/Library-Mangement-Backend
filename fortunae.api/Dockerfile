@@ -22,6 +22,14 @@ COPY . .
 WORKDIR "/src/fortunae.api"
 RUN dotnet build "./fortunae.api.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
+ENV ASPNETCORE_ENVIRONMENT=Production
+
+# Copy the .env file into the container
+COPY .env .env
+
+# Use the env variables in the entrypoint
+CMD [ "bash", "-c", "source .env && dotnet fortunae.api.dll" ]
+
 # This stage is used to publish the service project to be copied to the final stage
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release

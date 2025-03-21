@@ -77,7 +77,10 @@ var jwtSecretKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
 var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION")
     ?? throw new InvalidOperationException("DB_CONNECTION is not configured");
 builder.Services.AddDbContext<LibraryDbContext>(options =>
-    options.UseSqlServer(connectionString));
+    options.UseNpgsql(Environment.GetEnvironmentVariable("DATABASE_PUBLIC_URL") ?? 
+    "Host=postgres.railway.internal;Port=54336;Database=railway;Username=postgres;Password=SmvfiTtKLfUcXURLCoKHaXVHAVuFUHzP"));
+// builder.Services.AddDbContext<LibraryDbContext>(options =>
+//     options.UseSqlServer(connectionString));
 
 
 builder.Services.AddStackExchangeRedisCache(options =>

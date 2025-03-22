@@ -2,15 +2,24 @@
 {
     using fortunae.Domain.Entities;
     using Microsoft.EntityFrameworkCore;
+    using Microsoft.Extensions.Configuration;
+    // using Microsoft.EntityFrameworkCore;
+    using Npgsql.EntityFrameworkCore.PostgreSQL;
+
 
     public class LibraryDbContext : DbContext
     {
-        public LibraryDbContext(DbContextOptions<LibraryDbContext> options) : base(options) { }
+        private readonly IConfiguration _cofiguration;
+        public LibraryDbContext(DbContextOptions<LibraryDbContext> options) : base(options) 
+        { 
+            _cofiguration = configuration;
+        }
 
         public DbSet<User> Users { get; set; }
         public DbSet<Book> Books { get; set; }
         public DbSet<Borrowing> Borrowings { get; set; }
         public DbSet<Rating> Ratings { get; set; }
+        public IConfiguration? configuration { get; }
 
         public LibraryDbContext() { }
 
@@ -19,7 +28,8 @@
             if (!optionsBuilder.IsConfigured)
             {
                 // Provide a default connection string for migrations
-                optionsBuilder.UseSqlServer("YourConnectionStringHere");
+                 var connectionString = _cofiguration.GetConnectionString("DefaultConnection");
+                 optionsBuilder.UseNpgsql(connectionString);
             }
         }
 

@@ -2,7 +2,7 @@
 {
     "region" : "us-east-1",
     "configuration" : "Debug",
-    "framework"     : "net8.0",
+    "framework"     : "net9.0",
     "self-contained" : false,
     "application"    : "fortunaelibrary",
     "environment"    : "fortunaeapi-env",

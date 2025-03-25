@@ -45,7 +45,9 @@ namespace fortunae.Service.Services
                 PasswordHash = passwordHash,
                 Role = registerDto.Role,
                 Name = registerDto.Name,
-                DateOfBirth = registerDto.DateOfBirth,
+                 DateOfBirth = registerDto.DateOfBirth.Kind == DateTimeKind.Utc 
+            ? registerDto.DateOfBirth 
+            : DateTime.SpecifyKind(registerDto.DateOfBirth, DateTimeKind.Utc),
                 ProfileSummary = registerDto.ProfileSummary
             };
 
@@ -107,8 +109,11 @@ namespace fortunae.Service.Services
         private string GenerateJwtToken(string username, string role, string userId)
         {
             var jwtKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY");
-            var jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER");
-            var jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE");
+            if (string.IsNullOrEmpty(jwtKey) || jwtKey.Length < 32)
+                  throw new ArgumentException("JWT_SECRET_KEY is invalid or too short.");
+
+            // var jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER");
+            // var jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE");
 
 
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
@@ -118,21 +123,28 @@ namespace fortunae.Service.Services
             {
                 new Claim(ClaimTypes.Name, username),
                 new Claim(ClaimTypes.Role, role),
+                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()), // Unique token ID
                 new Claim("UserId", userId)
             };
 
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var tokenDescriptor = new SecurityTokenDescriptor
-            {
-                Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.UtcNow.AddMinutes(30),
-                Issuer = jwtIssuer,
-                Audience = jwtAudience,
-                SigningCredentials = credentials
-            };
+            //var tokenHandler = new JwtSecurityTokenHandler();
+            // var tokenDescriptor = new SecurityTokenDescriptor
+            // {
+            //     Subject = new ClaimsIdentity(claims),
+            //     Expires = DateTime.UtcNow.AddMinutes(30),
+            //     Issuer = jwtIssuer,
+            //     Audience = jwtAudience,
+            //     SigningCredentials = credentials
+            // };
 
-            var token = tokenHandler.CreateToken(tokenDescriptor);
-            return tokenHandler.WriteToken(token);
+            var token = new JwtSecurityToken(
+                issuer: Environment.GetEnvironmentVariable("JWT_ISSUER"),
+                audience: Environment.GetEnvironmentVariable("JWT_AUDIENCE"),
+                claims,
+                expires: DateTime.UtcNow.AddMinutes(30),
+                signingCredentials: credentials
+            );
+            return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
         private string HashPassword(string password)

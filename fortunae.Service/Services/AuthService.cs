@@ -106,47 +106,54 @@ namespace fortunae.Service.Services
             return true;
         }
 
-        private string GenerateJwtToken(string username, string role, string userId)
-        {
-            var jwtKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY");
-            if (string.IsNullOrEmpty(jwtKey) || jwtKey.Length < 32)
-                  throw new ArgumentException("JWT_SECRET_KEY is invalid or too short.");
-
-            // var jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER");
-            // var jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE");
+        
 
 
-            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
-            var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-            var claims = new[]
-            {
-                new Claim(ClaimTypes.Name, username),
-                new Claim(ClaimTypes.Role, role),
-                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()), // Unique token ID
-                new Claim("UserId", userId)
-            };
 
-            //var tokenHandler = new JwtSecurityTokenHandler();
-            // var tokenDescriptor = new SecurityTokenDescriptor
-            // {
-            //     Subject = new ClaimsIdentity(claims),
-            //     Expires = DateTime.UtcNow.AddMinutes(30),
-            //     Issuer = jwtIssuer,
-            //     Audience = jwtAudience,
-            //     SigningCredentials = credentials
-            // };
+private string GenerateJwtToken(string username, string role, string userId)
+{
+    // Fetch environment variables with fallback to configuration
+    var jwtKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY") ?? _configuration["Jwt:Key"];
+    var jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? _configuration["Jwt:Issuer"];
+    var jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? _configuration["Jwt:Audience"];
+    var jwtExpirationMinutes = int.TryParse(Environment.GetEnvironmentVariable("JWT_EXPIRATION") ?? _configuration["Jwt:Expiration"], out int minutes) ? minutes : 30;
 
-            var token = new JwtSecurityToken(
-                issuer: Environment.GetEnvironmentVariable("JWT_ISSUER"),
-                audience: Environment.GetEnvironmentVariable("JWT_AUDIENCE"),
-                claims,
-                expires: DateTime.UtcNow.AddMinutes(30),
-                signingCredentials: credentials
-            );
-            return new JwtSecurityTokenHandler().WriteToken(token);
-        }
+    // Validate inputs and log issues
+    if (string.IsNullOrEmpty(jwtKey) || jwtKey.Length < 32)
+        throw new ArgumentException($"JWT_SECRET_KEY is missing or too short. Must be at least 32 characters. Current value: '{jwtKey}'");
+    if (string.IsNullOrEmpty(jwtIssuer))
+        throw new ArgumentException($"JWT_ISSUER is missing. Current value: '{jwtIssuer}'");
+    if (string.IsNullOrEmpty(jwtAudience))
+        throw new ArgumentException($"JWT_AUDIENCE is missing. Current value: '{jwtAudience}'");
 
+    var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+    var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+    var claims = new[]
+    {
+        new Claim(JwtRegisteredClaimNames.Sub, username),
+        new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+        new Claim(ClaimTypes.Role, role),
+        new Claim("UserId", userId)
+    };
+
+    var token = new JwtSecurityToken(
+        issuer: jwtIssuer,
+        audience: jwtAudience,
+        claims: claims,
+        expires: DateTime.UtcNow.AddMinutes(jwtExpirationMinutes),
+        signingCredentials: credentials
+    );
+
+    var tokenHandler = new JwtSecurityTokenHandler();
+    var tokenString = tokenHandler.WriteToken(token);
+
+    // Log the token for debugging
+    Console.WriteLine($"Generated JWT: {tokenString}");
+
+    return tokenString;
+}
         private string HashPassword(string password)
         {
             using var sha256 = SHA256.Create();

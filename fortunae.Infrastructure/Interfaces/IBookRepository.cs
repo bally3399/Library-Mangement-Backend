@@ -11,5 +11,6 @@ namespace fortunae.Infrastructure.Interfaces
         Task UpdateBookAsync(Book book);
         Task DeleteBookAsync(Book book);
         Task<List<Book>> GetAvailableBooksAsync();
+        //Task AddAsync(Book book);
     }
 }

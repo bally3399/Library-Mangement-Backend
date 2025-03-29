@@ -10,6 +10,10 @@ using System.Threading.Tasks;
 
 public class PaginatedList<T> : List<T>
 {
+    private object sortedBooks;
+    private object count;
+    private int pageNumber;
+
     public int CurrentPage { get; private set; }
     public int PageSize { get; private set; }
     public int TotalCount { get; private set; }
@@ -26,6 +30,14 @@ public class PaginatedList<T> : List<T>
         TotalPages = (int)Math.Ceiling(count / (double)pageSize);
 
         AddRange(items);
+    }
+
+    public PaginatedList(object sortedBooks, object count, int pageNumber, int pageSize)
+    {
+        this.sortedBooks = sortedBooks;
+        this.count = count;
+        this.pageNumber = pageNumber;
+        PageSize = pageSize;
     }
 
     public static async Task<PaginatedList<T>> CreateAsync(

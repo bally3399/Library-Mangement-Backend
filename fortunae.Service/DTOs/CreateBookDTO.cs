@@ -11,6 +11,6 @@ namespace fortunae.Service.DTOs
         public string Genre { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public string ISBN { get; set; } = string.Empty;
-        public IFormFile? Image { get; set; }
+        public IFormFile? CoverImage { get; set; }
     }
 }

@@ -33,7 +33,7 @@ namespace fortunae.Controllers
             }
         }
         [HttpGet("test-auth")]
-        [Authorize]
+        [Authorize(AuthenticationSchemes = "CustomScheme")]
         public IActionResult TestAuth()
         {
             var headers = HttpContext.Request.Headers;

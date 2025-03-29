@@ -17,7 +17,7 @@ public class BookServiceTests
 {
     private readonly Mock<IBookRepository> _bookRepositoryMock;
     private readonly Mock<IRatingRepository> _ratingRepositoryMock;
-    private readonly Mock<IImageService> _imageServiceMock;
+    private readonly Mock<fortunae.Service.Interfaces.IImageService> _imageServiceMock;
     private readonly Mock<IRedisService> _cacheMock;
     private readonly Mock<ILogger<BookService>> _loggerMock;
     private readonly BookService _bookService;
@@ -26,7 +26,7 @@ public class BookServiceTests
     {
         _bookRepositoryMock = new Mock<IBookRepository>();
         _ratingRepositoryMock = new Mock<IRatingRepository>();
-        _imageServiceMock = new Mock<IImageService>();
+        _imageServiceMock = new Mock<fortunae.Service.Interfaces.IImageService>();
         _cacheMock = new Mock<IRedisService>();
         _loggerMock = new Mock<ILogger<BookService>>();
 
@@ -57,11 +57,11 @@ public class BookServiceTests
             Genre = "Fiction",
             ISBN = "1234567890",
             Description = "A test book description",
-            Image = fileMock.Object,
+            CoverImage = fileMock.Object,
         };
 
         var imageResponse = new ImageUrlResponseDto { PresignedUrl = "http://image.url" };
-        _imageServiceMock.Setup(x => x.UploadImageAsync(fileMock.Object)).ReturnsAsync(imageResponse);
+        // _imageServiceMock.Setup(x => x.UploadImageAsync(fileMock.Object)).ReturnsAsync(imageResponse);
         _bookRepositoryMock.Setup(x => x.AddBookAsync(It.IsAny<Book>())).Returns(Task.CompletedTask);
 
         // Act

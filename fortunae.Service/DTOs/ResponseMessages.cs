@@ -25,6 +25,8 @@ public class ResponseMessages
 
     public class ApiSuccessResponse<T>
     {
+        public readonly object id;
+
         public int Status { get; set; }
         public string? Message { get; set; }
         public T? Data { get; set; }
@@ -33,8 +35,9 @@ public class ResponseMessages
 
         // Pagination details (only included if response contains a paginated list)
         public PaginationInfo? Pagination { get; set; }
+        public object Id { get; set; }
 
-        public static ApiSuccessResponse<T> Create(T data, Stopwatch stopwatch, int? pageNumber = null, int? pageSize = null, int? totalCount = null)
+        public static ApiSuccessResponse<T> Create(T data, Stopwatch stopwatch, int? pageNumber = null, int? pageSize = null, int? totalCount = null, int status = 0, string message = null)
         {
             return new ApiSuccessResponse<T>
             {

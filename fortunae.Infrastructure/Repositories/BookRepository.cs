@@ -74,5 +74,9 @@ namespace fortunae.Infrastructure.Repositories
             await _dbContext.SaveChangesAsync();
         }
 
+        public Task AddAsync(Book book)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

@@ -10,7 +10,7 @@ namespace fortunae.Controllers
 
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize]
+    [Authorize(AuthenticationSchemes = "CustomScheme")]
     public class BooksController : ControllerBase
     {
         private readonly IBookService _bookService;
@@ -26,11 +26,23 @@ namespace fortunae.Controllers
         /// <param name="createBookDto">The book details.</param>
         /// <returns>The created book with its ID.</returns>
         [HttpPost("AddBook")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> AddBook([FromForm] CreateBookDTO createBookDto)
         {
-            var book = await _bookService.AddBookAsync(createBookDto);
-            return CreatedAtAction(nameof(GetAllBooksForAdmin), new { id = book }, book);
+            try
+            {
+                var book = await _bookService.AddBookAsync(createBookDto);
+                return CreatedAtAction(nameof(GetAllBooksForAdmin), new { id = book.id }, book);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    status = 500,
+                    message = "An unexpected error occurred while adding the book.",
+                    details = ex.Message
+                });
+            }
         }
 
         /// <summary>
@@ -40,7 +52,7 @@ namespace fortunae.Controllers
         /// <param name="updateBookDto">Updated book details.</param>
         /// <returns>The updated book.</returns>
         [HttpPut("{id}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> UpdateBook(Guid id, [FromForm] UpdateBookDTO updateBookDto)
         {
             var book = await _bookService.UpdateBookAsync(id, updateBookDto);
@@ -54,7 +66,7 @@ namespace fortunae.Controllers
         /// </summary>
         /// <returns>A list of all books.</returns>
         [HttpGet("admin")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> GetAllBooksForAdmin()
         {
             var books = await _bookService.GetAllBooksAsync(includeUnavailable: true);
@@ -67,7 +79,7 @@ namespace fortunae.Controllers
         /// <param name="bookId">The ID of the book to delete.</param>
         /// <returns>Success or failure message.</returns>
         [HttpDelete("book/{bookId}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> DeleteBookById(Guid bookId)
         {
             var result = await _bookService.DeleteBookAsync(bookId);

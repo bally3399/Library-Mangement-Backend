@@ -34,9 +34,6 @@ namespace fortunae.Infrastructure.Migrations
                     b.Property<decimal>("AverageRating")
                         .HasColumnType("decimal(5,2)");
 
-                    b.Property<string>("BookImage")
-                        .HasColumnType("text");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -48,6 +45,10 @@ namespace fortunae.Infrastructure.Migrations
 
                     b.Property<string>("ISBN")
                         .HasColumnType("text");
+
+                    b.Property<byte[]>("Image")
+                        .IsRequired()
+                        .HasColumnType("bytea");
 
                     b.Property<bool>("IsAvailable")
                         .HasColumnType("boolean");
@@ -61,7 +62,7 @@ namespace fortunae.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Books");
+                    b.ToTable("Books", (string)null);
                 });
 
             modelBuilder.Entity("fortunae.Domain.Entities.Borrowing", b =>
@@ -133,7 +134,7 @@ namespace fortunae.Infrastructure.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Ratings", t =>
+                    b.ToTable("Ratings", null, t =>
                         {
                             t.HasCheckConstraint("CHK_Rating_Value", "\"Value\" BETWEEN 1 AND 5");
                         });
@@ -169,7 +170,7 @@ namespace fortunae.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("fortunae.Domain.Entities.Borrowing", b =>

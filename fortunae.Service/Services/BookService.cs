@@ -1,20 +1,16 @@
-﻿
-namespace fortunae.Service.Services
+﻿namespace fortunae.Service.Services
 {
     using fortunae.Service.DTOs;
     using fortunae.Service.Interfaces;
     using fortunae.Domain.Entities;
     using fortunae.Infrastructure.Interfaces;
     using Microsoft.Extensions.Caching.Distributed;
-    using System.Text.Json;
     using Microsoft.Extensions.Logging;
-    using Microsoft.Extensions.Caching.Memory;
-    using fortunae.Service.Services.CacheService;
     using Microsoft.EntityFrameworkCore;
     using System.Diagnostics;
     using static fortunae.Service.DTOs.ResponseMessages;
     using fortunae.Domain.Constants;
-    using Amazon.S3.Model;
+    using fortunae.Service.Services.CacheService;
 
     public class BookService : IBookService
     {
@@ -39,19 +35,12 @@ namespace fortunae.Service.Services
             var stopwatch = Stopwatch.StartNew();
             try
             {
-                if (createBookDto.Image == null)
+                byte[] imageData = null;
+                if (createBookDto.CoverImage != null)
                 {
-                    return new ApiSuccessResponse<BookDTO>
-                    {
-                        Status = 400,
-                        Message = Message.ImageCannotBeEmpty,
-                        Data = null,
-                        RuntimeSeconds = stopwatch.Elapsed.TotalSeconds,
-                        Timestamp = DateTime.UtcNow
-                    };
+                    imageData = await _imageService.ProcessImageAsync(createBookDto.CoverImage);
                 }
 
-                ImageUrlResponseDto imageResponse = await _imageService.UploadImageAsync(createBookDto.Image);
                 var book = new Book
                 {
                     Id = Guid.NewGuid(),
@@ -60,8 +49,8 @@ namespace fortunae.Service.Services
                     Genre = createBookDto.Genre,
                     ISBN = createBookDto.ISBN,
                     Description = createBookDto.Description,
+                    Image = imageData, // Store image as byte[]
                     IsAvailable = true,
-                    BookImage = imageResponse.PresignedUrl,
                     CreatedAt = DateTime.UtcNow
                 };
 
@@ -69,18 +58,17 @@ namespace fortunae.Service.Services
                 await InvalidateBookCaches(book.Id);
                 stopwatch.Stop();
 
-                return new ApiSuccessResponse<BookDTO>
-                {
-                    Status = 201,
-                    Message = Message.BookAdded,
-                    Data = MapToBookDTO(book),
-                    RuntimeSeconds = stopwatch.Elapsed.TotalSeconds,
-                    Timestamp = DateTime.UtcNow
-                };
+                return ApiSuccessResponse<BookDTO>.Create(
+                    MapToBookDTO(book),
+                    stopwatch,
+                    status: 201,
+                    message: Message.BookAdded
+                );
             }
             catch (Exception ex)
             {
-                _logger.LogError("An error occurred while adding the book: {Exception}", ex);
+                _logger.LogError("An error occurred while adding the book: {Message}", ex.Message);
+                stopwatch.Stop();
                 return new ApiSuccessResponse<BookDTO>
                 {
                     Status = 500,
@@ -92,8 +80,7 @@ namespace fortunae.Service.Services
             }
         }
 
-
-        public async Task<ResponseMessages.ApiSuccessResponse<BookDTO>> UpdateBookAsync(Guid id, UpdateBookDTO updateBookDto)
+        public async Task<ApiSuccessResponse<BookDTO>> UpdateBookAsync(Guid id, UpdateBookDTO updateBookDto)
         {
             var stopwatch = Stopwatch.StartNew();
             try
@@ -101,7 +88,8 @@ namespace fortunae.Service.Services
                 var book = await _bookRepository.GetBookByIdAsync(id);
                 if (book == null)
                 {
-                    return new ResponseMessages.ApiSuccessResponse<BookDTO>
+                    stopwatch.Stop();
+                    return new ApiSuccessResponse<BookDTO>
                     {
                         Status = 404,
                         Message = "Book not found.",
@@ -111,8 +99,7 @@ namespace fortunae.Service.Services
 
                 if (updateBookDto.Image != null)
                 {
-                    ImageUrlResponseDto imageResponse = await _imageService.UploadImageAsync(updateBookDto.Image);
-                    book.BookImage = imageResponse.PresignedUrl;
+                    book.Image = await _imageService.ProcessImageAsync(updateBookDto.Image); // Update image as byte[]
                 }
 
                 book.Title = updateBookDto.Title ?? book.Title;
@@ -127,22 +114,27 @@ namespace fortunae.Service.Services
                 await InvalidateBookCaches(book.Id);
                 stopwatch.Stop();
 
-                return ResponseMessages.ApiSuccessResponse<BookDTO>.Create(MapToBookDTO(book), stopwatch);
+                return ApiSuccessResponse<BookDTO>.Create(
+                    MapToBookDTO(book),
+                    stopwatch,
+                    message: "Book updated successfully"
+                );
             }
             catch (Exception ex)
             {
-                return new ResponseMessages.ApiSuccessResponse<BookDTO>
+                _logger.LogError("Error updating book: {Message}", ex.Message);
+                stopwatch.Stop();
+                return new ApiSuccessResponse<BookDTO>
                 {
                     Status = 500,
                     Message = Message.ErrorUpdatingBook,
                     RuntimeSeconds = stopwatch.Elapsed.TotalSeconds,
-                    Data = null,
-                    
+                    Data = null
                 };
             }
         }
 
-        public async Task<ResponseMessages.ApiSuccessResponse<BookDTO>> GetBooksByIdAsync(Guid bookId)
+        public async Task<ApiSuccessResponse<BookDTO>> GetBooksByIdAsync(Guid bookId)
         {
             var stopwatch = Stopwatch.StartNew();
             try
@@ -153,16 +145,14 @@ namespace fortunae.Service.Services
                 if (cachedBook != null)
                 {
                     stopwatch.Stop();
-                    return ResponseMessages.ApiSuccessResponse<BookDTO>.Create(
-                        cachedBook, stopwatch
-                    );
+                    return ApiSuccessResponse<BookDTO>.Create(cachedBook, stopwatch);
                 }
 
                 var book = await _bookRepository.GetBookByIdAsync(bookId);
                 if (book == null)
                 {
                     stopwatch.Stop();
-                    return new ResponseMessages.ApiSuccessResponse<BookDTO>
+                    return new ApiSuccessResponse<BookDTO>
                     {
                         Status = 404,
                         Message = $"Book with ID {bookId} not found.",
@@ -175,14 +165,13 @@ namespace fortunae.Service.Services
                 await _cache.SetAsync(cacheKey, bookDto, TimeSpan.FromMinutes(CACHE_DURATION_MINUTES));
 
                 stopwatch.Stop();
-                return ResponseMessages.ApiSuccessResponse<BookDTO>.Create(
-                    bookDto, stopwatch
-                );
+                return ApiSuccessResponse<BookDTO>.Create(bookDto, stopwatch);
             }
             catch (Exception ex)
             {
+                _logger.LogError("Error retrieving book: {Message}", ex.Message);
                 stopwatch.Stop();
-                return new ResponseMessages.ApiSuccessResponse<BookDTO>
+                return new ApiSuccessResponse<BookDTO>
                 {
                     Status = 500,
                     Message = Message.ErrorRetrievingBook,
@@ -192,8 +181,7 @@ namespace fortunae.Service.Services
             }
         }
 
-
-        public async Task<ResponseMessages.ApiSuccessResponse<PaginatedList<BookDTO>>> GetAllBooksAsync(bool includeUnavailable = false, int pageNumber = 1, int pageSize = 10)
+        public async Task<ApiSuccessResponse<PaginatedList<BookDTO>>> GetAllBooksAsync(bool includeUnavailable = false, int pageNumber = 1, int pageSize = 10)
         {
             var stopwatch = Stopwatch.StartNew();
             try
@@ -204,7 +192,7 @@ namespace fortunae.Service.Services
                 if (cachedBooks != null)
                 {
                     stopwatch.Stop();
-                    return ResponseMessages.ApiSuccessResponse<PaginatedList<BookDTO>>.Create(
+                    return ApiSuccessResponse<PaginatedList<BookDTO>>.Create(
                         new PaginatedList<BookDTO>(
                             includeUnavailable ? cachedBooks : cachedBooks.Where(b => b.IsAvailable).ToList(),
                             pageNumber, pageSize, cachedBooks.Count
@@ -225,21 +213,24 @@ namespace fortunae.Service.Services
                 await _cache.SetAsync(cacheKey, bookDtos, TimeSpan.FromMinutes(CACHE_DURATION_MINUTES));
 
                 stopwatch.Stop();
-                return ResponseMessages.ApiSuccessResponse<PaginatedList<BookDTO>>.Create(
+                return ApiSuccessResponse<PaginatedList<BookDTO>>.Create(
                     new PaginatedList<BookDTO>(bookDtos, pageNumber, pageSize, paginatedBooks.TotalCount),
                     stopwatch, pageNumber, pageSize, paginatedBooks.TotalCount
                 );
             }
             catch (Exception ex)
             {
+                _logger.LogError("Error retrieving books: {Message}", ex.Message);
                 stopwatch.Stop();
-                return ResponseMessages.ApiSuccessResponse<PaginatedList<BookDTO>>.Create(
-                    null, 
-                    stopwatch, pageNumber, pageSize, 0 
-                );
+                return new ApiSuccessResponse<PaginatedList<BookDTO>>
+                {
+                    Status = 500,
+                    Message = "Error retrieving books",
+                    Data = null,
+                    RuntimeSeconds = stopwatch.Elapsed.TotalSeconds
+                };
             }
-
-            }
+        }
 
         public async Task<PaginatedList<BookDTO>> GetAvailableBooksAsync(string? filter = null, int pageNumber = 1, int pageSize = 10)
         {
@@ -257,13 +248,10 @@ namespace fortunae.Service.Services
                           b.Genre.Contains(filter, StringComparison.OrdinalIgnoreCase))
                       .ToList();
 
-                // Sort cached results in descending order
                 var sortedBooks = filteredBooks.OrderByDescending(b => b.CreatedAt).ToList();
-
                 return new PaginatedList<BookDTO>(sortedBooks, cachedBooks.Count, pageNumber, pageSize);
             }
 
-            
             IQueryable<Book> query = _bookRepository.GetBooksAsync(null, null).Where(b => b.IsAvailable);
 
             if (!string.IsNullOrWhiteSpace(filter))
@@ -273,7 +261,6 @@ namespace fortunae.Service.Services
                                          EF.Functions.Like(b.Genre, $"%{filter}%"));
             }
 
-            
             query = query.OrderByDescending(b => b.CreatedAt);
 
             var paginatedBooks = await PaginatedList<Book>.CreateAsync(query, pageNumber, pageSize);
@@ -283,6 +270,7 @@ namespace fortunae.Service.Services
 
             return new PaginatedList<BookDTO>(bookDtos, paginatedBooks.TotalCount, pageNumber, pageSize);
         }
+
         public async Task AddRatingAsync(Guid bookId, Guid userId, int value, string? comment = null)
         {
             var rating = new Rating
@@ -299,31 +287,28 @@ namespace fortunae.Service.Services
 
             var ratings = await _ratingRepository.GetRatingsByBookIdAsync(bookId);
             var book = await _bookRepository.GetBookByIdAsync(bookId);
-            Console.WriteLine($"Ratings: {ratings.Count()}"); 
             if (ratings.Any())
             {
                 book.AverageRating = (decimal)ratings.Average(r => r.Value);
             }
             else
             {
-                book.AverageRating = 0;  
+                book.AverageRating = 0;
             }
-
-            
-            book.AverageRating = (decimal)ratings.Average(r => r.Value);
 
             await _bookRepository.UpdateBookAsync(book);
         }
 
         public async Task<List<BookDTO>> GetTopRatedBooksAsync(int top = 10)
         {
-            var books =  _bookRepository.GetBooksAsync(null, null);
+            var books = _bookRepository.GetBooksAsync(null, null);
             return books
                 .OrderByDescending(b => b.AverageRating)
                 .Take(top)
                 .Select(MapToBookDTO)
                 .ToList();
         }
+
         public async Task<List<BookDTO>> GetCachedTopRatedBooksAsync()
         {
             string cacheVersion = await GetCacheVersionAsync();
@@ -339,7 +324,7 @@ namespace fortunae.Service.Services
             return books;
         }
 
-        public async Task<PaginatedList<BookDTO>> SearchBooksAsync(string? title = null, string? author = null, string? genre = null,bool? isAvailable = null, int pageNumber = 1, int pageSize = 10)
+        public async Task<PaginatedList<BookDTO>> SearchBooksAsync(string? title = null, string? author = null, string? genre = null, bool? isAvailable = null, int pageNumber = 1, int pageSize = 10)
         {
             IQueryable<Book> query = _bookRepository.GetBooksAsync(null, null);
 
@@ -378,9 +363,10 @@ namespace fortunae.Service.Services
             if (book == null)
                 throw new KeyNotFoundException(Message.BookNotFound);
 
-            var relatedBooks =  _bookRepository.GetBooksAsync(book.Genre, book.Author);
+            var relatedBooks = _bookRepository.GetBooksAsync(book.Genre, book.Author);
             return relatedBooks.Where(b => b.Id != bookId).Select(MapToBookDTO).ToList();
         }
+
         public async Task<List<RatingDTO>> GetRatingsByBookIdAsync(Guid bookId)
         {
             var ratings = await _ratingRepository.GetRatingsByBookIdAsync(bookId);
@@ -393,6 +379,7 @@ namespace fortunae.Service.Services
                 CreatedAt = r.CreatedAt
             }).ToList();
         }
+
         public async Task<List<RatingDTO>> GetRatingsByUserIdAsync(Guid userId)
         {
             var ratings = await _ratingRepository.GetRatingsByUserIdAsync(userId);
@@ -461,25 +448,22 @@ namespace fortunae.Service.Services
             return version;
         }
 
-
-
         private BookDTO MapToBookDTO(Book book)
         {
             return new BookDTO
             {
                 Id = book.Id,
                 Title = book.Title,
-                Author = book.Author!,
-                Genre = book.Genre!,
-                Description = book.Description!,
-                ISBN = book.ISBN!,
+                Author = book.Author ?? string.Empty,
+                Genre = book.Genre ?? string.Empty,
+                Description = book.Description ?? string.Empty,
+                ISBN = book.ISBN ?? string.Empty,
                 IsAvailable = book.IsAvailable,
-                BookImage = book.BookImage!,
+                BookImage = book.Image != null ? Convert.ToBase64String(book.Image) : null, // Return image as base64 string
                 AverageRating = book.AverageRating,
                 CreatedAt = book.CreatedAt,
                 UpdatedAt = book.UpdatedAt
             };
         }
     }
-
 }

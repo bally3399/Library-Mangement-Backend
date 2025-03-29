@@ -1,13 +1,10 @@
-﻿
-using fortunae.Service.DTOs;
+﻿// fortunae.Service.Interfaces/IImageService.cs
 using Microsoft.AspNetCore.Http;
 
-namespace fortunae.Service.Interfaces;
-
-public interface IImageService
+namespace fortunae.Service.Interfaces
 {
-    Task<ImageUrlResponseDto> UploadImageAsync(IFormFile file);
-    Task<bool> UpdateImageAsync(string fileKey, IFormFile file);
-    Task<bool> DeleteImageAsync(string fileKey);
-    Task<Stream> GetImageAsync(string fileKey);
+    public interface IImageService
+    {
+        Task<byte[]> ProcessImageAsync(IFormFile file);
+    }
 }

@@ -1,24 +1,14 @@
-﻿using fortunae.Domain.Entities;
+﻿// fortunae.Infrastructure.Data/LibraryDbContext.cs
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
+using fortunae.Domain.Entities;
 
 namespace fortunae.Infrastructure.Data
 {
     public class LibraryDbContext : DbContext
     {
-        private readonly IConfiguration _configuration;
-
-        public LibraryDbContext(DbContextOptions<LibraryDbContext> options, IConfiguration configuration) 
-            : base(options) 
+        public LibraryDbContext(DbContextOptions<LibraryDbContext> options) 
+            : base(options)
         {
-            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-        }
-
-        public LibraryDbContext() 
-        {
-            _configuration = new ConfigurationBuilder()
-                .AddEnvironmentVariables()
-                .Build();
         }
 
         public DbSet<User> Users { get; set; }
@@ -30,7 +20,7 @@ namespace fortunae.Infrastructure.Data
         {
             if (!optionsBuilder.IsConfigured)
             {
-                var connectionString = _configuration["DATABASE_PUBLIC_URL"] 
+                var connectionString = Environment.GetEnvironmentVariable("DATABASE_PUBLIC_URL") 
                     ?? "Host=shinkansen.proxy.rlwy.net;Port=45474;Username=postgres;Password=gPUbFWPknMQftgIPCpcAmjzMzONxaXJf;Database=railway;SslMode=Require;TrustServerCertificate=true";
                 optionsBuilder.UseNpgsql(connectionString);
             }
@@ -39,6 +29,10 @@ namespace fortunae.Infrastructure.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<User>().ToTable("Users");
+            modelBuilder.Entity<Book>().ToTable("Books");
+            modelBuilder.Entity<Rating>().ToTable("Ratings");
 
             modelBuilder.Entity<Borrowing>()
                 .HasOne(b => b.User)
@@ -66,6 +60,10 @@ namespace fortunae.Infrastructure.Data
                 .Property(b => b.AverageRating)
                 .HasColumnType("decimal(5,2)");
 
+            modelBuilder.Entity<Book>()
+                .Property(b => b.Image)
+                .HasColumnType("bytea");
+
             modelBuilder.Entity<Rating>()
                 .HasOne(r => r.User)
                 .WithMany()
@@ -76,7 +74,6 @@ namespace fortunae.Infrastructure.Data
                 .Property(r => r.Value)
                 .IsRequired();
 
-            // Fix the CHECK constraint with quoted column name
             modelBuilder.Entity<Rating>()
                 .HasCheckConstraint("CHK_Rating_Value", "\"Value\" BETWEEN 1 AND 5");
 

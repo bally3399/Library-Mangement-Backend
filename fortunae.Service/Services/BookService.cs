@@ -18,16 +18,15 @@
         private readonly IRatingRepository _ratingRepository;
         private readonly ILogger<BookService> _logger;
         private readonly IImageService _imageService;
-        private readonly IRedisService _cache;
-        private const int CACHE_DURATION_MINUTES = 10;
+        
+        //private const int CACHE_DURATION_MINUTES = 10;
 
-        public BookService(IBookRepository bookRepository, ILogger<BookService> logger, IImageService imageService, IRedisService cache, IRatingRepository ratingRepository)
+        public BookService(IBookRepository bookRepository, ILogger<BookService> logger, IImageService imageService,  IRatingRepository ratingRepository)
         {
             _bookRepository = bookRepository;
             _logger = logger;
             _imageService = imageService;
             _ratingRepository = ratingRepository;
-            _cache = cache;
         }
 
         public async Task<ApiSuccessResponse<BookDTO>> AddBookAsync(CreateBookDTO createBookDto)
@@ -141,12 +140,12 @@
             {
                 string cacheKey = $"Book_{bookId}";
 
-                var cachedBook = await _cache.GetAsync<BookDTO>(cacheKey);
-                if (cachedBook != null)
-                {
-                    stopwatch.Stop();
-                    return ApiSuccessResponse<BookDTO>.Create(cachedBook, stopwatch);
-                }
+             //   var cachedBook = await _cache.GetAsync<BookDTO>(cacheKey);
+                // if (cachedBook != null)
+                // {
+                //     stopwatch.Stop();
+                //     return ApiSuccessResponse<BookDTO>.Create(cachedBook, stopwatch);
+                // }
 
                 var book = await _bookRepository.GetBookByIdAsync(bookId);
                 if (book == null)
@@ -162,7 +161,7 @@
                 }
 
                 var bookDto = MapToBookDTO(book);
-                await _cache.SetAsync(cacheKey, bookDto, TimeSpan.FromMinutes(CACHE_DURATION_MINUTES));
+//                await _cache.SetAsync(cacheKey, bookDto, TimeSpan.FromMinutes(CACHE_DURATION_MINUTES));
 
                 stopwatch.Stop();
                 return ApiSuccessResponse<BookDTO>.Create(bookDto, stopwatch);
@@ -188,18 +187,18 @@
             {
                 string cacheKey = $"AllBooks_Page{pageNumber}_Size{pageSize}_Include{includeUnavailable}";
 
-                var cachedBooks = await _cache.GetAsync<List<BookDTO>>(cacheKey);
-                if (cachedBooks != null)
-                {
-                    stopwatch.Stop();
-                    return ApiSuccessResponse<PaginatedList<BookDTO>>.Create(
-                        new PaginatedList<BookDTO>(
-                            includeUnavailable ? cachedBooks : cachedBooks.Where(b => b.IsAvailable).ToList(),
-                            pageNumber, pageSize, cachedBooks.Count
-                        ),
-                        stopwatch, pageNumber, pageSize, cachedBooks.Count
-                    );
-                }
+               // var cachedBooks = await _cache.GetAsync<List<BookDTO>>(cacheKey);
+                // if (cachedBooks != null)
+                // {
+                //     stopwatch.Stop();
+                //     return ApiSuccessResponse<PaginatedList<BookDTO>>.Create(
+                //         new PaginatedList<BookDTO>(
+                //             includeUnavailable ? cachedBooks : cachedBooks.Where(b => b.IsAvailable).ToList(),
+                //             pageNumber, pageSize, cachedBooks.Count
+                //         ),
+                //         stopwatch, pageNumber, pageSize, cachedBooks.Count
+                //     );
+                // }
 
                 IQueryable<Book> query = _bookRepository.GetBooksAsync(null, null);
                 if (!includeUnavailable)
@@ -210,7 +209,7 @@
                 var paginatedBooks = await PaginatedList<Book>.CreateAsync(query, pageNumber, pageSize);
                 var bookDtos = paginatedBooks.Select(MapToBookDTO).ToList();
 
-                await _cache.SetAsync(cacheKey, bookDtos, TimeSpan.FromMinutes(CACHE_DURATION_MINUTES));
+  //              await _cache.SetAsync(cacheKey, bookDtos, TimeSpan.FromMinutes(CACHE_DURATION_MINUTES));
 
                 stopwatch.Stop();
                 return ApiSuccessResponse<PaginatedList<BookDTO>>.Create(
@@ -232,44 +231,31 @@
             }
         }
 
-        public async Task<PaginatedList<BookDTO>> GetAvailableBooksAsync(string? filter = null, int pageNumber = 1, int pageSize = 10)
-        {
-            string cacheVersion = await GetCacheVersionAsync();
-            string cacheKey = $"AvailableBooks_{cacheVersion}_Page{pageNumber}_Size{pageSize}_Filter{filter}";
+       public async Task<PaginatedList<BookDTO>> GetAvailableBooksAsync(string? filter = null, int pageNumber = 1, int pageSize = 10)
+{
+    // Query the database for available books
+    IQueryable<Book> query = _bookRepository.GetBooksAsync(null, null).Where(b => b.IsAvailable);
 
-            var cachedBooks = await _cache.GetAsync<List<BookDTO>>(cacheKey);
-            if (cachedBooks != null)
-            {
-                var filteredBooks = string.IsNullOrWhiteSpace(filter)
-                    ? cachedBooks
-                    : cachedBooks.Where(b =>
-                          b.Title.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
-                          b.Author.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
-                          b.Genre.Contains(filter, StringComparison.OrdinalIgnoreCase))
-                      .ToList();
+    // Apply filter if provided
+    if (!string.IsNullOrWhiteSpace(filter))
+    {
+        query = query.Where(b => EF.Functions.Like(b.Title, $"%{filter}%") ||
+                                 EF.Functions.Like(b.Author, $"%{filter}%") ||
+                                 EF.Functions.Like(b.Genre, $"%{filter}%"));
+    }
 
-                var sortedBooks = filteredBooks.OrderByDescending(b => b.CreatedAt).ToList();
-                return new PaginatedList<BookDTO>(sortedBooks, cachedBooks.Count, pageNumber, pageSize);
-            }
+    // Sort by CreatedAt in descending order
+    query = query.OrderByDescending(b => b.CreatedAt);
 
-            IQueryable<Book> query = _bookRepository.GetBooksAsync(null, null).Where(b => b.IsAvailable);
+    // Paginate the results
+    var paginatedBooks = await PaginatedList<Book>.CreateAsync(query, pageNumber, pageSize);
 
-            if (!string.IsNullOrWhiteSpace(filter))
-            {
-                query = query.Where(b => EF.Functions.Like(b.Title, $"%{filter}%") ||
-                                         EF.Functions.Like(b.Author, $"%{filter}%") ||
-                                         EF.Functions.Like(b.Genre, $"%{filter}%"));
-            }
+    // Map to DTOs
+    var bookDtos = paginatedBooks.Select(MapToBookDTO).ToList();
 
-            query = query.OrderByDescending(b => b.CreatedAt);
-
-            var paginatedBooks = await PaginatedList<Book>.CreateAsync(query, pageNumber, pageSize);
-            var bookDtos = paginatedBooks.Select(MapToBookDTO).ToList();
-
-            await _cache.SetAsync(cacheKey, bookDtos, TimeSpan.FromMinutes(CACHE_DURATION_MINUTES));
-
-            return new PaginatedList<BookDTO>(bookDtos, paginatedBooks.TotalCount, pageNumber, pageSize);
-        }
+    // Return paginated list
+    return new PaginatedList<BookDTO>(bookDtos, paginatedBooks.TotalCount, pageNumber, pageSize);
+}
 
         public async Task AddRatingAsync(Guid bookId, Guid userId, int value, string? comment = null)
         {
@@ -309,20 +295,20 @@
                 .ToList();
         }
 
-        public async Task<List<BookDTO>> GetCachedTopRatedBooksAsync()
-        {
-            string cacheVersion = await GetCacheVersionAsync();
-            string cacheKey = "TopRatedBooks";
+        // public async Task<List<BookDTO>> GetCachedTopRatedBooksAsync()
+        // {
+        //     string cacheVersion = await GetCacheVersionAsync();
+        //     string cacheKey = "TopRatedBooks";
 
-            var cachedBooks = await _cache.GetAsync<List<BookDTO>>(cacheKey);
-            if (cachedBooks != null)
-                return cachedBooks;
+        //     //var cachedBooks = await _cache.GetAsync<List<BookDTO>>(cacheKey);
+        //     if (cachedBooks != null)
+        //         return cachedBooks;
 
-            var books = await GetTopRatedBooksAsync();
-            await _cache.SetAsync(cacheKey, books, TimeSpan.FromMinutes(15));
+        //     var books = await GetTopRatedBooksAsync();
+        //     await _cache.SetAsync(cacheKey, books, TimeSpan.FromMinutes(15));
 
-            return books;
-        }
+        //     return books;
+        // }
 
         public async Task<PaginatedList<BookDTO>> SearchBooksAsync(string? title = null, string? author = null, string? genre = null, bool? isAvailable = null, int pageNumber = 1, int pageSize = 10)
         {
@@ -412,9 +398,9 @@
         private async Task InvalidateBookCaches(Guid bookId)
         {
             string versionKey = "BookCacheVersion";
-            await _cache.SetAsync(versionKey, Guid.NewGuid().ToString(), TimeSpan.FromDays(1));
+            //await _cache.SetAsync(versionKey, Guid.NewGuid().ToString(), TimeSpan.FromDays(1));
 
-            var keysToInvalidate = await _cache.GetKeysWithPrefixAsync("AvailableBooks_");
+            //var keysToInvalidate = await _cache.GetKeysWithPrefixAsync("AvailableBooks_");
 
             var cacheKeys = new HashSet<string>
             {
@@ -423,30 +409,30 @@
                 $"Book_{bookId}"
             };
 
-            foreach (var key in keysToInvalidate)
-            {
-                cacheKeys.Add(key);
-            }
+            // foreach (var key in keysToInvalidate)
+            // {
+            //     cacheKeys.Add(key);
+            // }
 
-            foreach (var key in cacheKeys)
-            {
-                await _cache.RemoveAsync(key);
-            }
+            // foreach (var key in cacheKeys)
+            // {
+            //     await _cache.RemoveAsync(key);
+            // }
         }
 
-        private async Task<string> GetCacheVersionAsync()
-        {
-            string versionKey = "BookCacheVersion";
-            var version = await _cache.GetAsync<string>(versionKey);
+        // private async Task<string> GetCacheVersionAsync()
+        // {
+        //     string versionKey = "BookCacheVersion";
+        //     var version = await _cache.GetAsync<string>(versionKey);
 
-            if (version == null)
-            {
-                version = Guid.NewGuid().ToString();
-                await _cache.SetAsync(versionKey, version, TimeSpan.FromDays(1));
-            }
+        //     if (version == null)
+        //     {
+        //         version = Guid.NewGuid().ToString();
+        //         await _cache.SetAsync(versionKey, version, TimeSpan.FromDays(1));
+        //     }
 
-            return version;
-        }
+        //     return version;
+        // }
 
         private BookDTO MapToBookDTO(Book book)
         {

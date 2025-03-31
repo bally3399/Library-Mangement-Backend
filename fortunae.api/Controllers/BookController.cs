@@ -175,11 +175,11 @@ namespace fortunae.Controllers
         /// </summary>
         /// <returns>A list of cached top-rated books.</returns>
         [HttpGet("top-rated/cached")]
-        public async Task<IActionResult> GetCachedTopRatedBooks()
-        {
-            var books = await _bookService.GetCachedTopRatedBooksAsync();
-            return Ok(books);
-        }
+        // public async Task<IActionResult> GetCachedTopRatedBooks()
+        // {
+        //     var books = await _bookService.GetCachedTopRatedBooksAsync();
+        //     return Ok(books);
+        // }
 
         /// <summary>
         /// Retrieves books related to a specific book.

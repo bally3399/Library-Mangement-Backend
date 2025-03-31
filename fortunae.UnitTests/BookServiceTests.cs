@@ -34,7 +34,6 @@ public class BookServiceTests
             _bookRepositoryMock.Object,
             _loggerMock.Object,
             _imageServiceMock.Object,
-            _cacheMock.Object,
             _ratingRepositoryMock.Object
         );
     }

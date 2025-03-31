@@ -46,5 +46,9 @@
   <ItemGroup>
     <ProjectReference Include="..\fortunae.Domain\fortunae.Domain.csproj" />
     <ProjectReference Include="..\fortunae.Service\fortunae.Service.csproj" />
+   <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.3">
+     <PrivateAssets>all</PrivateAssets>
+   <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+</PackageReference>
   </ItemGroup>
 </Project>

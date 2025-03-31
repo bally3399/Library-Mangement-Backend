@@ -301,7 +301,7 @@ Console.WriteLine($"Generated signature: {signature}");
                 throw new KeyNotFoundException(Message.UserNotFound);
 
             user.Name = profileDto.Name ?? user.Name;
-            user.DateOfBirth = profileDto.DateOfBirth ?? user.DateOfBirth;
+            user.DateOfBirth = DateTime.SpecifyKind((DateTime)(profileDto.DateOfBirth ?? user.DateOfBirth), DateTimeKind.Utc);
             user.ProfileSummary = profileDto.ProfileSummary ?? user.ProfileSummary;
 
             await _userRepository.UpdateUserAsync(user);

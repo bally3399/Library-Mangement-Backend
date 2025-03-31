@@ -11,7 +11,7 @@ namespace fortunae.Domain.Entities
         public string? Description { get; set; }
         public string? ISBN { get; set; }
         public bool IsAvailable { get; set; }
-        public byte[] Image { get; set; }
+        public byte[]? Image { get; set; }
         public decimal AverageRating { get; set; } 
         public ICollection<Rating> Ratings { get; set; } = new List<Rating>();
         public DateTime CreatedAt { get; set; }

@@ -180,56 +180,92 @@
             }
         }
 
-        public async Task<ApiSuccessResponse<PaginatedList<BookDTO>>> GetAllBooksAsync(bool includeUnavailable = false, int pageNumber = 1, int pageSize = 10)
+//         public async Task<ApiSuccessResponse<PaginatedList<BookDTO>>> GetAllBooksAsync(bool includeUnavailable = false, int pageNumber = 1, int pageSize = 10)
+//         {
+//             var stopwatch = Stopwatch.StartNew();
+//             try
+//             {
+//                 string cacheKey = $"AllBooks_Page{pageNumber}_Size{pageSize}_Include{includeUnavailable}";
+
+//                // var cachedBooks = await _cache.GetAsync<List<BookDTO>>(cacheKey);
+//                 // if (cachedBooks != null)
+//                 // {
+//                 //     stopwatch.Stop();
+//                 //     return ApiSuccessResponse<PaginatedList<BookDTO>>.Create(
+//                 //         new PaginatedList<BookDTO>(
+//                 //             includeUnavailable ? cachedBooks : cachedBooks.Where(b => b.IsAvailable).ToList(),
+//                 //             pageNumber, pageSize, cachedBooks.Count
+//                 //         ),
+//                 //         stopwatch, pageNumber, pageSize, cachedBooks.Count
+//                 //     );
+//                 // }
+
+//                 IQueryable<Book> query = _bookRepository.GetBooksAsync(null, null);
+//                 if (!includeUnavailable)
+//                 {
+//                     query = query.Where(b => b.IsAvailable);
+//                 }
+
+//                 var paginatedBooks = await PaginatedList<Book>.CreateAsync(query, pageNumber, pageSize);
+//                 var bookDtos = paginatedBooks.Select(MapToBookDTO).ToList();
+
+//   //              await _cache.SetAsync(cacheKey, bookDtos, TimeSpan.FromMinutes(CACHE_DURATION_MINUTES));
+
+//                 stopwatch.Stop();
+//                 return ApiSuccessResponse<PaginatedList<BookDTO>>.Create(
+//                     new PaginatedList<BookDTO>(bookDtos, pageNumber, pageSize, paginatedBooks.TotalCount),
+//                     stopwatch, pageNumber, pageSize, paginatedBooks.TotalCount
+//                 );
+//             }
+//             catch (Exception ex)
+//             {
+//                 _logger.LogError("Error retrieving books: {Message}", ex.Message);
+//                 stopwatch.Stop();
+//                 return new ApiSuccessResponse<PaginatedList<BookDTO>>
+//                 {
+//                     Status = 500,
+//                     Message = "Error retrieving books",
+//                     Data = null,
+//                     RuntimeSeconds = stopwatch.Elapsed.TotalSeconds
+//                 };
+//             }
+//         }
+
+public async Task<ApiSuccessResponse<PaginatedList<BookDTO>>> GetAllBooksAsync(bool includeUnavailable = false, int pageNumber = 1, int pageSize = 10)
+{
+    var stopwatch = Stopwatch.StartNew();
+    try
+    {
+        // Query the database directly
+        IQueryable<Book> query = _bookRepository.GetBooksAsync(null, null);
+        if (!includeUnavailable)
         {
-            var stopwatch = Stopwatch.StartNew();
-            try
-            {
-                string cacheKey = $"AllBooks_Page{pageNumber}_Size{pageSize}_Include{includeUnavailable}";
-
-               // var cachedBooks = await _cache.GetAsync<List<BookDTO>>(cacheKey);
-                // if (cachedBooks != null)
-                // {
-                //     stopwatch.Stop();
-                //     return ApiSuccessResponse<PaginatedList<BookDTO>>.Create(
-                //         new PaginatedList<BookDTO>(
-                //             includeUnavailable ? cachedBooks : cachedBooks.Where(b => b.IsAvailable).ToList(),
-                //             pageNumber, pageSize, cachedBooks.Count
-                //         ),
-                //         stopwatch, pageNumber, pageSize, cachedBooks.Count
-                //     );
-                // }
-
-                IQueryable<Book> query = _bookRepository.GetBooksAsync(null, null);
-                if (!includeUnavailable)
-                {
-                    query = query.Where(b => b.IsAvailable);
-                }
-
-                var paginatedBooks = await PaginatedList<Book>.CreateAsync(query, pageNumber, pageSize);
-                var bookDtos = paginatedBooks.Select(MapToBookDTO).ToList();
-
-  //              await _cache.SetAsync(cacheKey, bookDtos, TimeSpan.FromMinutes(CACHE_DURATION_MINUTES));
-
-                stopwatch.Stop();
-                return ApiSuccessResponse<PaginatedList<BookDTO>>.Create(
-                    new PaginatedList<BookDTO>(bookDtos, pageNumber, pageSize, paginatedBooks.TotalCount),
-                    stopwatch, pageNumber, pageSize, paginatedBooks.TotalCount
-                );
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("Error retrieving books: {Message}", ex.Message);
-                stopwatch.Stop();
-                return new ApiSuccessResponse<PaginatedList<BookDTO>>
-                {
-                    Status = 500,
-                    Message = "Error retrieving books",
-                    Data = null,
-                    RuntimeSeconds = stopwatch.Elapsed.TotalSeconds
-                };
-            }
+            query = query.Where(b => b.IsAvailable);
         }
+
+        // Paginate the results
+        var paginatedBooks = await PaginatedList<Book>.CreateAsync(query, pageNumber, pageSize);
+        var bookDtos = paginatedBooks.Select(MapToBookDTO).ToList();
+
+        stopwatch.Stop();
+        return ApiSuccessResponse<PaginatedList<BookDTO>>.Create(
+            new PaginatedList<BookDTO>(bookDtos, pageNumber, pageSize, paginatedBooks.TotalCount),
+            stopwatch, pageNumber, pageSize, paginatedBooks.TotalCount
+        );
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError("Error retrieving books: {Message}", ex.Message);
+        stopwatch.Stop();
+        return new ApiSuccessResponse<PaginatedList<BookDTO>>
+        {
+            Status = 500,
+            Message = "Error retrieving books",
+            Data = null,
+            RuntimeSeconds = stopwatch.Elapsed.TotalSeconds
+        };
+    }
+}
 
        public async Task<PaginatedList<BookDTO>> GetAvailableBooksAsync(string? filter = null, int pageNumber = 1, int pageSize = 10)
 {

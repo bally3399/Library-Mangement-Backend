@@ -40,11 +40,6 @@ var connectionString = Environment.GetEnvironmentVariable("DATABASE_PUBLIC_URL")
 builder.Services.AddDbContext<LibraryDbContext>(options =>
     options.UseNpgsql(connectionString));
 
- // Redis
-// var redisConnection = Environment.GetEnvironmentVariable("REDIS_CONNECTION")
-//     ?? throw new InvalidOperationException("REDIS_CONNECTION is not configured");
-// var multiplexer = ConnectionMultiplexer.Connect(redisConnection);
-// builder.Services.AddSingleton<IConnectionMultiplexer>(multiplexer);
 
 // Services
 builder.Services.AddScoped<IUserRepository, UserRepository>();
